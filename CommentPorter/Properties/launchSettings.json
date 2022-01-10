@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CommentPorter": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\maui\\maui\\src\\Core\\src\\Core-net6.csproj\""
+    }
+  }
+}

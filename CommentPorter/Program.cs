@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace CommentPorter
 {
-    internal class Program
+    internal partial class Program
     {
         static async Task Main(string[] args)
         {
@@ -53,87 +53,87 @@ namespace CommentPorter
                     .WithAnalyzers(analyzers)
                     .GetAnalyzerDiagnosticsAsync();
 
+                var fixedDiagnostics = new List<string>();
+
                 foreach (var diagnostic in results)
                 {
                     var diagnosticId = diagnostic.Id;
 
-                    Console.WriteLine($"Severity: {diagnostic.Severity}\tMessage: {diagnostic.GetMessage()}");
-
-                    var document = project.GetDocument(diagnostic.Location.SourceTree);
-
-                    CodeAction action = null;
-                    var context = new CodeFixContext(document, diagnostic,
-                        (a, _) =>
-                        {
-                            if (action == null)
-                            {
-                                action = a;
-                            }
-                        },
-                        cancellationToken);
-
-                    var codeFixProvider = fixes[0];
-                    var fixAllProvider = codeFixProvider.GetFixAllProvider();
-
-                    await codeFixProvider.RegisterCodeFixesAsync(context);
-
-                    var fixAllContext = new FixAllContext(
-                  document: document,
-                  codeFixProvider: codeFixProvider,
-                  scope: FixAllScope.Project,
-                  codeActionEquivalenceKey: action.EquivalenceKey, // FixAllState supports null equivalence key. This should still be supported.
-                  diagnosticIds: new[] { diagnosticId },
-                  fixAllDiagnosticProvider: new DiagnosticProvider(results),
-                  cancellationToken: cancellationToken);
-
-                    var fixAllAction = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
-                    if (fixAllAction is null)
+                    if (fixedDiagnostics.Contains(diagnosticId)) 
                     {
-                        Console.WriteLine($"Something didn't work with fixAllAction");
+                        // Already got this one, probably during a bulk operation
                         continue;
                     }
 
-                    var operations = await fixAllAction.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
-                    var applyChangesOperation = operations.OfType<ApplyChangesOperation>().SingleOrDefault();
-                    if (applyChangesOperation is null)
+                    Console.WriteLine($"Working on {diagnostic.Descriptor.Title}...");
+
+                    var fixProvider = fixes.Where(f => f.FixableDiagnosticIds.Contains(diagnosticId)).FirstOrDefault();
+
+                    if (fixProvider != null)
                     {
-                        Console.WriteLine($"Something didn't work with operations");
-                        continue;
+                        var changes = await GetChangesForDiagnostic(project, diagnostic, fixProvider,
+                            new DiagnosticProvider(results), cancellationToken);
+
+                        Console.WriteLine($"Determined changes for {diagnostic.Descriptor.Title}, applying...");
+
+                        changes.Apply(workspace, cancellationToken);
+
+                        Console.WriteLine($"Changes for {diagnostic.Descriptor.Title} applied.");
                     }
 
-                    applyChangesOperation.Apply(workspace, cancellationToken);
-
-                    break; // Wrong, but we'll add the bits to skip the diagnostic types we've already done later
+                    fixedDiagnostics.Add(diagnosticId);
                 }
 
-                Console.WriteLine($"Analysis complete");
+                Console.WriteLine($"Done!");
             }
         }
 
-        private class DiagnosticProvider : FixAllContext.DiagnosticProvider
+        static async Task<ApplyChangesOperation> GetChangesForDiagnostic(Project project, Diagnostic diagnostic, CodeFixProvider codeFixProvider,
+            DiagnosticProvider diagnosticProvider,
+            CancellationToken cancellationToken) 
         {
-            readonly IList<Diagnostic> _diagnostics;
+            var document = project.GetDocument(diagnostic.Location.SourceTree);
 
-            public DiagnosticProvider(IList<Diagnostic> diagnostics)
+            CodeAction action = null;
+            var context = new CodeFixContext(document, diagnostic,
+                (a, _) =>
+                {
+                    if (action == null)
+                    {
+                        action = a;
+                    }
+                },
+                cancellationToken);
+
+            var fixAllProvider = codeFixProvider.GetFixAllProvider();
+
+            await codeFixProvider.RegisterCodeFixesAsync(context);
+
+            var fixAllContext = new FixAllContext(
+              document: document,
+              codeFixProvider: codeFixProvider,
+              scope: FixAllScope.Project,
+              codeActionEquivalenceKey: action.EquivalenceKey, // FixAllState supports null equivalence key. This should still be supported.
+              diagnosticIds: new[] { diagnostic.Id },
+              fixAllDiagnosticProvider: diagnosticProvider,
+              cancellationToken: cancellationToken);
+
+            var fixAllAction = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
+            if (fixAllAction is null)
             {
-                _diagnostics = diagnostics;
+                Console.WriteLine($"Something didn't work with fixAllAction");
+                return null;
             }
 
-            public override Task<IEnumerable<Diagnostic>> GetAllDiagnosticsAsync(Project project, CancellationToken cancellationToken)
+            var operations = await fixAllAction.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
+            var applyChangesOperation = operations.OfType<ApplyChangesOperation>().SingleOrDefault();
+            if (applyChangesOperation is null)
             {
-                return Task.FromResult(_diagnostics.AsEnumerable());
+                Console.WriteLine($"Something didn't work with operations");
+                return null;
             }
 
-            public override async Task<IEnumerable<Diagnostic>> GetDocumentDiagnosticsAsync(Document document, CancellationToken cancellationToken)
-            {
-                var tree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
-                return _diagnostics.Where(d => tree == d.Location.SourceTree);
-            }
-
-            public override Task<IEnumerable<Diagnostic>> GetProjectDiagnosticsAsync(Project project, CancellationToken cancellationToken)
-            {
-                return GetAllDiagnosticsAsync(project, cancellationToken);
-            }
+           return applyChangesOperation;
         }
 
         private static VisualStudioInstance SelectVisualStudioInstance(VisualStudioInstance[] visualStudioInstances)

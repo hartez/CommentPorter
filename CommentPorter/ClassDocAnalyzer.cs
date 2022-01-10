@@ -15,8 +15,10 @@ namespace CommentPorter
         internal static readonly LocalizableString MessageFormat = "'{0}'";
         internal const string Category = "MAUIDocPort";
 
-        internal static DiagnosticDescriptor Rule = 
+        internal static DiagnosticDescriptor Rule =
+#pragma warning disable RS2008 // Enable analyzer release tracking
             new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, true);
+#pragma warning restore RS2008 // Enable analyzer release tracking
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
             ImmutableArray.Create(Rule);
@@ -55,9 +57,22 @@ namespace CommentPorter
             var nsds = syntaxNodeAnalysisContext.Node.Ancestors().OfType<NamespaceDeclarationSyntax>().First();
             var namespaceName = nsds.Name.ToString();
 
-            // TODO ezhart This value needs to include the full relative path e.g. ../../docs/Easing.xml
-            propsBuilder.Add(DocumentationFileKey, node.Identifier.ValueText + ".xml");
-            propsBuilder.Add(ClassFullNameKey, $"{namespaceName}.{node.Identifier.ValueText}");
+            var className = node.Identifier.ValueText;
+            var filePath = node.GetLocation().SourceTree.FilePath;
+
+            var docPath = DocFinder.BuildRelativeDocPath(className, filePath);
+
+            if (docPath == null) 
+            {
+                // There's no corresponding documentation file to link to 
+                return;
+            }
+
+            // TODO We need to fix the slashes in this result to use ../.. instead of ..\..
+           
+
+            propsBuilder.Add(DocumentationFileKey, docPath);
+            propsBuilder.Add(ClassFullNameKey, $"{namespaceName}.{className}");
 
             var props = propsBuilder.ToImmutable();
 

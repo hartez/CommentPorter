@@ -38,6 +38,7 @@ namespace CommentPorter
                 workspace.WorkspaceFailed += (o, e) => Console.WriteLine(e.Diagnostic.Message);
 
                 var projectPath = args[0];
+
                 Console.WriteLine($"Loading project '{projectPath}'");
 
                 // Attach progress reporter so we print projects as they are loaded.

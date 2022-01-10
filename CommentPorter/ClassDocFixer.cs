@@ -46,7 +46,7 @@ namespace CommentPorter
             diagnostic.Properties.TryGetValue(ClassDocAnalyzer.ClassFullNameKey, out string classFullName);
 
             var token = root.FindToken(diagnostic.Location.SourceSpan.Start, findInsideTrivia: true);
-            var tagText = $"/// <include file=\"../../docs/{documentationFile}\" path=\"//Type[@FullName='{classFullName}']/Docs\" />\n\t";
+            var tagText = $"/// <include file=\"{documentationFile}\" path=\"//Type[@FullName='{classFullName}']/Docs\" />\n\t";
             
             return new TextChange(new TextSpan(token.SpanStart, 0), tagText);
         }

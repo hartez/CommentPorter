@@ -68,9 +68,6 @@ namespace CommentPorter
                 return;
             }
 
-            // TODO We need to fix the slashes in this result to use ../.. instead of ..\..
-           
-
             propsBuilder.Add(DocumentationFileKey, docPath);
             propsBuilder.Add(ClassFullNameKey, $"{namespaceName}.{className}");
 

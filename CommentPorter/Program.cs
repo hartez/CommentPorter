@@ -24,11 +24,7 @@ namespace CommentPorter
                 // If there is only one instance of MSBuild on this machine, set that as the one to use.
                 ? visualStudioInstances[0]
                 // Handle selecting the version of MSBuild you want to use.
-                //: SelectVisualStudioInstance(visualStudioInstances);
-            
-                // Just doing this for now so I don't have to keep selecting during testing
-                : visualStudioInstances[0];
-
+                : SelectVisualStudioInstance(visualStudioInstances);
 
             Console.WriteLine($"Using MSBuild at '{instance.MSBuildPath}' to load projects.");
             

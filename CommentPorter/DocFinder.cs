@@ -55,6 +55,8 @@ namespace CommentPorter
 
             if (!File.Exists(docPath)) 
             {
+               
+
                 return null;
             }
 

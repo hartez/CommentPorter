@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Text;
+using System;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,7 +47,7 @@ namespace CommentPorter
             diagnostic.Properties.TryGetValue(ClassDocAnalyzer.XPathKey, out string xpath);
 
             var token = root.FindToken(diagnostic.Location.SourceSpan.Start, findInsideTrivia: true);
-            var tagText = $"/// <include file=\"{documentationFile}\" path=\"{xpath}\" />\n\t";
+            var tagText = $"/// <include file=\"{documentationFile}\" path=\"{xpath}\" />{Environment.NewLine}\t";
             
             return new TextChange(new TextSpan(token.SpanStart, 0), tagText);
         }

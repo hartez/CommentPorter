@@ -10,6 +10,9 @@ namespace CommentPorter
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     internal class ClassDocAnalyzer : DiagnosticAnalyzer
     {
+        public const string DocumentationFileKey = "docfile";
+        public const string XPathKey = "xpath";
+
         public const string DiagnosticId = "PublicClassDoc";
         internal static readonly LocalizableString Title = "Public classes and members should point to existing class docs";
         internal static readonly LocalizableString MessageFormat = "'{0}'";
@@ -27,10 +30,8 @@ namespace CommentPorter
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
-            context.RegisterSyntaxNodeAction(CheckForMissingClassInclude, SyntaxKind.ClassDeclaration);
 
-            // TODO ezhart need to handle enum, struct
-            context.RegisterSyntaxNodeAction(CheckForMissingEnumInclude, SyntaxKind.EnumDeclaration);
+            context.RegisterSyntaxNodeAction(CheckForMissingInclude, SyntaxKind.ClassDeclaration, SyntaxKind.EnumDeclaration, SyntaxKind.StructDeclaration);
 
             // TODO Then we need to figure out what stuff is missing and why
             // Probably mismatching docs filenames and class/struct/enum names
@@ -38,62 +39,26 @@ namespace CommentPorter
             context.RegisterSyntaxNodeAction(CheckForMissingMethodInclude, SyntaxKind.MethodDeclaration);
         }
 
-        public const string DocumentationFileKey = "docfile";
-        public const string XPathKey = "xpath";
-
-        static bool HasDocComment(CSharpSyntaxNode node) 
+        void CheckForMissingInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
         {
-            return node.GetLeadingTrivia()
-                   .Select(i => i.GetStructure())
-                   .OfType<DocumentationCommentTriviaSyntax>()
-                   .FirstOrDefault() != null;
-        }
+            var node = syntaxNodeAnalysisContext.Node as MemberDeclarationSyntax;
 
-        static bool IsPublic(MemberDeclarationSyntax syntax)
-        {
-            return syntax.Modifiers.Any(SyntaxKind.PublicKeyword);
-        }
-
-        static string FindNamespace(SyntaxNodeAnalysisContext context) 
-        {
-            var nsds = context.Node.Ancestors().OfType<NamespaceDeclarationSyntax>().First();
-            return nsds.Name.ToString();
-        }
-
-        ImmutableDictionary<string, string> BuildProps(string docPath, string xpath) 
-        {
-            var propsBuilder = ImmutableDictionary.CreateBuilder<string, string>();
-            propsBuilder.Add(DocumentationFileKey, docPath);
-            propsBuilder.Add(XPathKey, xpath);
-            return propsBuilder.ToImmutable();
-        }
-
-        void CheckForMissingClassInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
-        {
-            var node = syntaxNodeAnalysisContext.Node as ClassDeclarationSyntax;
-
-            if (!IsPublic(node)) 
+            if (!IsPublic(node) || HasDocComment(node)) 
             {
                 return;
             }
-
-            if (HasDocComment(node)) 
-            {
-                return;
-            }
-
-            
 
             var namespaceName = FindNamespace(syntaxNodeAnalysisContext);
 
-            var unitName = node.Identifier.ValueText;
+            var unitName = GetUnitName(syntaxNodeAnalysisContext);
             var filePath = node.GetLocation().SourceTree.FilePath;
 
             var docPath = DocFinder.BuildRelativeDocPath(unitName, filePath);
 
             if (docPath == null) 
             {
-                // There's no corresponding documentation file to link to 
+                // There's no corresponding documentation file to link 
+                System.Diagnostics.Debug.WriteLine($"Was looking for docs for {unitName}, didn't find anything.");
                 return;
             }
 
@@ -101,42 +66,7 @@ namespace CommentPorter
 
             var props = BuildProps(docPath, xpath);
 
-            var diagnostic = Diagnostic.Create(Rule, node.GetLocation(), properties: props, "Missing XML comments on class");
-            syntaxNodeAnalysisContext.ReportDiagnostic(diagnostic);
-        }
-
-        void CheckForMissingEnumInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
-        {
-            var node = syntaxNodeAnalysisContext.Node as EnumDeclarationSyntax;
-
-            if (!IsPublic(node))
-            {
-                return;
-            }
-
-            if (HasDocComment(node))
-            {
-                return;
-            }
-
-            var namespaceName = FindNamespace(syntaxNodeAnalysisContext);
-
-            var unitName = node.Identifier.ValueText;
-            var filePath = node.GetLocation().SourceTree.FilePath;
-
-            var docPath = DocFinder.BuildRelativeDocPath(unitName, filePath);
-
-            if (docPath == null)
-            {
-                // There's no corresponding documentation file to link to 
-                return;
-            }
-
-            string xpath = $"Type[@FullName='{namespaceName}.{unitName}'/Docs";
-
-            var props = BuildProps(docPath, xpath);
-
-            var diagnostic = Diagnostic.Create(Rule, node.GetLocation(), properties: props, "Missing XML comments on class");
+            var diagnostic = Diagnostic.Create(Rule, node.GetLocation(), properties: props, "Missing XML comments");
             syntaxNodeAnalysisContext.ReportDiagnostic(diagnostic);
         }
 
@@ -144,17 +74,15 @@ namespace CommentPorter
         {
             var node = syntaxNodeAnalysisContext.Node as MethodDeclarationSyntax;
 
-            if (!IsPublic(node))
+            if (!IsPublic(node) || HasDocComment(node))
             {
                 return;
             }
 
-            if (HasDocComment(node))
+            if (node.Modifiers.Any(m => m.IsKind(Microsoft.CodeAnalysis.VisualBasic.SyntaxKind.OverridesKeyword))) 
             {
-                return;
+                // TODO ezhart Isn't there an <inherits> for docs for override methods?
             }
-
-            var propsBuilder = ImmutableDictionary.CreateBuilder<string, string>();
 
             var methodName = node.Identifier.ValueText;
 
@@ -172,12 +100,9 @@ namespace CommentPorter
 
             string xpath = $"//Member[@MemberName='{methodName}']/Docs";
 
-            propsBuilder.Add(DocumentationFileKey, docPath);
-            propsBuilder.Add(XPathKey, xpath);
+            var props = BuildProps(docPath, xpath);
 
-            var props = propsBuilder.ToImmutable();
-            
-            var diagnostic = Diagnostic.Create(Rule, node.GetLocation(), properties: props, "Missing XML comments on method");
+            var diagnostic = Diagnostic.Create(Rule, node.GetLocation(), properties: props, "Missing XML comments");
             syntaxNodeAnalysisContext.ReportDiagnostic(diagnostic);
         }
 
@@ -202,6 +127,53 @@ namespace CommentPorter
             var structDeclaration = ancestors.OfType<StructDeclarationSyntax>().FirstOrDefault();
 
             return structDeclaration.Identifier.ValueText;
+        }
+
+        static bool HasDocComment(CSharpSyntaxNode node)
+        {
+            return node.GetLeadingTrivia()
+                   .Select(i => i.GetStructure())
+                   .OfType<DocumentationCommentTriviaSyntax>()
+                   .FirstOrDefault() != null;
+        }
+
+        static bool IsPublic(MemberDeclarationSyntax syntax)
+        {
+            return syntax.Modifiers.Any(SyntaxKind.PublicKeyword);
+        }
+
+        static string FindNamespace(SyntaxNodeAnalysisContext context)
+        {
+            var nsds = context.Node.Ancestors().OfType<NamespaceDeclarationSyntax>().First();
+            return nsds.Name.ToString();
+        }
+
+        ImmutableDictionary<string, string> BuildProps(string docPath, string xpath)
+        {
+            var propsBuilder = ImmutableDictionary.CreateBuilder<string, string>();
+            propsBuilder.Add(DocumentationFileKey, docPath);
+            propsBuilder.Add(XPathKey, xpath);
+            return propsBuilder.ToImmutable();
+        }
+
+        static string GetUnitName(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
+        {
+            if (syntaxNodeAnalysisContext.Node is ClassDeclarationSyntax node)
+            {
+                return node.Identifier.ValueText;
+            }
+
+            if (syntaxNodeAnalysisContext.Node is EnumDeclarationSyntax enumNode)
+            {
+                return enumNode.Identifier.ValueText;
+            }
+
+            if (syntaxNodeAnalysisContext.Node is StructDeclarationSyntax structNode)
+            {
+                return structNode.Identifier.ValueText;
+            }
+
+            throw new System.Exception($"Not prepared for {syntaxNodeAnalysisContext}");
         }
     }
 }

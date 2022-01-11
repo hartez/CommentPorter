@@ -27,13 +27,14 @@ namespace CommentPorter
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
-            context.RegisterSyntaxNodeAction(CheckForMissingInclude, SyntaxKind.ClassDeclaration);
+            context.RegisterSyntaxNodeAction(CheckForMissingClassInclude, SyntaxKind.ClassDeclaration);
+            context.RegisterSyntaxNodeAction(CheckForMissingMethodInclude, SyntaxKind.MethodDeclaration);
         }
 
         public const string DocumentationFileKey = "docfile";
         public const string ClassFullNameKey = "classfullname";
 
-        void CheckForMissingInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
+        void CheckForMissingClassInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
         {
             var node = syntaxNodeAnalysisContext.Node as ClassDeclarationSyntax;
 

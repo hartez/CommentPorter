@@ -19,6 +19,12 @@ namespace CommentPorter
             do
             {
                 startDir = Path.GetDirectoryName(startDir);
+
+                if (string.IsNullOrEmpty(startDir)) 
+                {
+                    throw new Exception("No docs folder found.");
+                }
+
                 docs = Path.Combine(startDir, "docs");
             }
             while (!Directory.Exists(docs));

@@ -43,10 +43,10 @@ namespace CommentPorter
         static TextChange GetTextChange(SyntaxNode root, Diagnostic diagnostic)
         {
             diagnostic.Properties.TryGetValue(ClassDocAnalyzer.DocumentationFileKey, out string documentationFile);
-            diagnostic.Properties.TryGetValue(ClassDocAnalyzer.ClassFullNameKey, out string classFullName);
+            diagnostic.Properties.TryGetValue(ClassDocAnalyzer.XPathKey, out string xpath);
 
             var token = root.FindToken(diagnostic.Location.SourceSpan.Start, findInsideTrivia: true);
-            var tagText = $"/// <include file=\"{documentationFile}\" path=\"//Type[@FullName='{classFullName}']/Docs\" />\n\t";
+            var tagText = $"/// <include file=\"{documentationFile}\" path=\"{xpath}\" />\n\t";
             
             return new TextChange(new TextSpan(token.SpanStart, 0), tagText);
         }

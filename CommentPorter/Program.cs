@@ -24,7 +24,11 @@ namespace CommentPorter
                 // If there is only one instance of MSBuild on this machine, set that as the one to use.
                 ? visualStudioInstances[0]
                 // Handle selecting the version of MSBuild you want to use.
-                : SelectVisualStudioInstance(visualStudioInstances);
+                //: SelectVisualStudioInstance(visualStudioInstances);
+            
+                // Just doing this for now so I don't have to keep selecting during testing
+                : visualStudioInstances[0];
+
 
             Console.WriteLine($"Using MSBuild at '{instance.MSBuildPath}' to load projects.");
             
@@ -77,6 +81,7 @@ namespace CommentPorter
 
                         Console.WriteLine($"Determined changes for {diagnostic.Descriptor.Title}, applying...");
 
+                        // TODO ezhart something is borking the line endings when this edits
                         changes.Apply(workspace, cancellationToken);
 
                         Console.WriteLine($"Changes for {diagnostic.Descriptor.Title} applied.");

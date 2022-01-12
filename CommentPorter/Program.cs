@@ -18,6 +18,8 @@ namespace CommentPorter
     {
         static async Task Main(string[] args)
         {
+            string mauiFolder = "C:\\maui\\maui\\src";
+
             // Attempt to set the version of MSBuild.
             var visualStudioInstances = MSBuildLocator.QueryVisualStudioInstances().ToArray();
             var instance = visualStudioInstances.Length == 1
@@ -30,14 +32,52 @@ namespace CommentPorter
             
             MSBuildLocator.RegisterInstance(instance);
 
+            var projectPaths = new List<string>() 
+            {
+                Path.Combine(mauiFolder, "Core\\src\\Core-net6.csproj"),
+                Path.Combine(mauiFolder, "Controls\\src\\Core\\Controls.Core-net6.csproj")
+            };
+
+            var rootNamespaces = new List<string>()
+            {
+                "Microsoft.Maui",
+                "Microsoft.Maui.Controls"
+            };
+
+            var docsPaths = new List<string>() 
+            {
+                Path.Combine(mauiFolder, "Core\\docs"),
+                Path.Combine(mauiFolder, "Controls\\docs")
+            };
+
+            DocFinder.DocsSource = "C:\\maui\\Xamarin.Forms-api-docs\\docs";
+
+            for (int n = 0; n < projectPaths.Count; n++) 
+            {
+                await UpdateDocsForProject(projectPaths[n], docsPaths[n], rootNamespaces[n]);
+            }            
+        }
+
+        static async Task UpdateDocsForProject(string projectPath, string docsPath, string namespaceRoot) 
+        {
             CancellationToken cancellationToken = CancellationToken.None;
+
+            DocFinder.DocsPath = docsPath;
+            DocFinder.NamespaceMap = new NamespaceMap(namespaceRoot);
+
+            // Clean out the docs folder if it exists
+            if (Directory.Exists(docsPath))
+            {
+                Directory.Delete(docsPath, true);    
+            }
+
+            // And create it anew
+            Directory.CreateDirectory(docsPath);
 
             using (var workspace = MSBuildWorkspace.Create())
             {
                 // Print message for WorkspaceFailed event to help diagnosing project load failures.
                 workspace.WorkspaceFailed += (o, e) => Console.WriteLine(e.Diagnostic.Message);
-
-                var projectPath = args[0];
 
                 Console.WriteLine($"Loading project '{projectPath}'");
 
@@ -60,7 +100,7 @@ namespace CommentPorter
                 {
                     var diagnosticId = diagnostic.Id;
 
-                    if (fixedDiagnostics.Contains(diagnosticId)) 
+                    if (fixedDiagnostics.Contains(diagnosticId))
                     {
                         // Already got this one, probably during a bulk operation
                         continue;

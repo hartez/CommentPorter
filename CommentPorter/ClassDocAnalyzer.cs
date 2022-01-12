@@ -53,7 +53,7 @@ namespace CommentPorter
             var unitName = GetUnitName(syntaxNodeAnalysisContext);
             var filePath = node.GetLocation().SourceTree.FilePath;
 
-            var docPath = DocFinder.BuildRelativeDocPath(unitName, filePath);
+            var docPath = DocFinder.BuildRelativeDocPath(unitName, namespaceName, filePath);
 
             if (docPath == null) 
             {
@@ -62,7 +62,7 @@ namespace CommentPorter
                 return;
             }
 
-            string xpath = $"Type[@FullName='{namespaceName}.{unitName}'/Docs";
+            string xpath = $"Type[@FullName='{namespaceName}.{unitName}']/Docs";
 
             var props = BuildProps(docPath, xpath);
 
@@ -81,7 +81,8 @@ namespace CommentPorter
 
             if (node.Modifiers.Any(m => m.IsKind(Microsoft.CodeAnalysis.VisualBasic.SyntaxKind.OverridesKeyword))) 
             {
-                // TODO ezhart Isn't there an <inherits> for docs for override methods?
+                // TODO ezhart Isn't there <inheritDoc/> for override methods?
+                // Can probably report a different diagnostic ID here and have a different fix that just adds <inheritDoc/>
             }
 
             var methodName = node.Identifier.ValueText;
@@ -90,7 +91,9 @@ namespace CommentPorter
 
             var filePath = node.GetLocation().SourceTree.FilePath;
 
-            var docPath = DocFinder.BuildRelativeDocPath(declarationName, filePath);
+            var namespaceName = FindNamespace(syntaxNodeAnalysisContext);
+
+            var docPath = DocFinder.BuildRelativeDocPath(declarationName, namespaceName, filePath);
 
             if (docPath == null)
             {

@@ -97,6 +97,7 @@ namespace CommentPorter
             if (docPath == null)
             {
                 // There's no corresponding documentation file to link to 
+                System.Diagnostics.Debug.WriteLine($"Was looking for docs for {memberName}, didn't find anything.");
                 return;
             }
 

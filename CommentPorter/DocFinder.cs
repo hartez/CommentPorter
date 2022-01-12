@@ -52,8 +52,8 @@ namespace CommentPorter
                     if (File.Exists(sourcePath))
                     {
                         var destinationDir = Path.GetDirectoryName(docFilePath);
-                        if (!Directory.Exists(destinationDir)) 
-                        { 
+                        if (!Directory.Exists(destinationDir))
+                        {
                             Directory.CreateDirectory(destinationDir);
                         }
 
@@ -64,6 +64,11 @@ namespace CommentPorter
                         string content = File.ReadAllText(docFilePath);
                         content = content.Replace(NamespaceMap.FormsRoot, NamespaceMap.Root);
                         File.WriteAllText(docFilePath, content);
+                    }
+                    else
+                    {
+                        // There's no source documentation to link to
+                        return null;
                     }
                 }
             }

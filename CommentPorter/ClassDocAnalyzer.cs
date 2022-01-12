@@ -35,7 +35,7 @@ namespace CommentPorter
                 SyntaxKind.EnumDeclaration, SyntaxKind.StructDeclaration);
 
             context.RegisterSyntaxNodeAction(CheckForMissingMemberInclude, SyntaxKind.MethodDeclaration, 
-                SyntaxKind.PropertyDeclaration, SyntaxKind.FieldDeclaration);
+                SyntaxKind.PropertyDeclaration, SyntaxKind.FieldDeclaration, SyntaxKind.EnumMemberDeclaration);
         }
 
         void CheckForMissingInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
@@ -154,7 +154,32 @@ namespace CommentPorter
 
         static bool IsPublic(MemberDeclarationSyntax syntax)
         {
+            if (IsPublicEnumMember(syntax)) 
+            {
+                return true;
+            }
+
             return syntax.Modifiers.Any(SyntaxKind.PublicKeyword);
+        }
+
+        static bool IsPublicEnumMember(MemberDeclarationSyntax syntax) 
+        {
+            // We don't explicitly mark members of public enums as 'public', so we need to check
+            // that an enum member declaration is part of a public enum; looking for the keyword
+            // like we do with other declarations doesn't work.
+
+            var node = syntax as EnumMemberDeclarationSyntax;
+            if (node == null) 
+            {
+                return false;
+            }
+
+            if (node.Parent is EnumDeclarationSyntax enumDeclaration) 
+            {
+                return IsPublic(enumDeclaration);
+            }
+
+            return false;
         }
 
         static string FindNamespace(SyntaxNodeAnalysisContext context)
@@ -203,6 +228,11 @@ namespace CommentPorter
                 // We're assuming nobody is doing public fields like
                 // public int x, y;
                 return fieldNode.Declaration.Variables[0].Identifier.ValueText;
+            }
+
+            if (syntaxNodeAnalysisContext.Node is EnumMemberDeclarationSyntax enumMemberNode)
+            {
+                return enumMemberNode.Identifier.ValueText;
             }
 
             throw new System.Exception($"Not prepared for {syntaxNodeAnalysisContext}");

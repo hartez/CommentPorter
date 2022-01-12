@@ -31,12 +31,11 @@ namespace CommentPorter
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
 
-            context.RegisterSyntaxNodeAction(CheckForMissingInclude, SyntaxKind.ClassDeclaration, SyntaxKind.EnumDeclaration, SyntaxKind.StructDeclaration);
+            context.RegisterSyntaxNodeAction(CheckForMissingInclude, SyntaxKind.ClassDeclaration, 
+                SyntaxKind.EnumDeclaration, SyntaxKind.StructDeclaration);
 
-            // TODO Then we need to figure out what stuff is missing and why
-            // Probably mismatching docs filenames and class/struct/enum names
-
-            context.RegisterSyntaxNodeAction(CheckForMissingMethodInclude, SyntaxKind.MethodDeclaration);
+            context.RegisterSyntaxNodeAction(CheckForMissingMemberInclude, SyntaxKind.MethodDeclaration, 
+                SyntaxKind.PropertyDeclaration, SyntaxKind.FieldDeclaration);
         }
 
         void CheckForMissingInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
@@ -70,22 +69,22 @@ namespace CommentPorter
             syntaxNodeAnalysisContext.ReportDiagnostic(diagnostic);
         }
 
-        void CheckForMissingMethodInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
+        void CheckForMissingMemberInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
         {
-            var node = syntaxNodeAnalysisContext.Node as MethodDeclarationSyntax;
+            var node = syntaxNodeAnalysisContext.Node as MemberDeclarationSyntax;
 
             if (!IsPublic(node) || HasDocComment(node))
             {
                 return;
             }
 
-            if (node.Modifiers.Any(m => m.IsKind(Microsoft.CodeAnalysis.VisualBasic.SyntaxKind.OverridesKeyword))) 
+            if (node.Modifiers.Any(m => m.IsKind(Microsoft.CodeAnalysis.VisualBasic.SyntaxKind.OverridesKeyword)))
             {
                 // TODO ezhart Isn't there <inheritDoc/> for override methods?
                 // Can probably report a different diagnostic ID here and have a different fix that just adds <inheritDoc/>
             }
 
-            var methodName = node.Identifier.ValueText;
+            var memberName = GetUnitName(syntaxNodeAnalysisContext);
 
             var declarationName = GetContainingDeclarationName(node);
 
@@ -101,7 +100,7 @@ namespace CommentPorter
                 return;
             }
 
-            string xpath = $"//Member[@MemberName='{methodName}']/Docs";
+            string xpath = $"//Member[@MemberName='{memberName}']/Docs";
 
             var props = BuildProps(docPath, xpath);
 
@@ -129,7 +128,19 @@ namespace CommentPorter
 
             var structDeclaration = ancestors.OfType<StructDeclarationSyntax>().FirstOrDefault();
 
-            return structDeclaration.Identifier.ValueText;
+            if (structDeclaration != null) 
+            {
+                return structDeclaration.Identifier.ValueText;
+            }
+
+            var interfaceDeclaration = ancestors.OfType<InterfaceDeclarationSyntax>().FirstOrDefault();
+
+            if (interfaceDeclaration != null)
+            {
+                return interfaceDeclaration.Identifier.ValueText;
+            }
+
+            throw new System.Exception($"Not prepared for {node}");
         }
 
         static bool HasDocComment(CSharpSyntaxNode node)
@@ -174,6 +185,23 @@ namespace CommentPorter
             if (syntaxNodeAnalysisContext.Node is StructDeclarationSyntax structNode)
             {
                 return structNode.Identifier.ValueText;
+            }
+
+            if (syntaxNodeAnalysisContext.Node is MethodDeclarationSyntax methodNode)
+            {
+                return methodNode.Identifier.ValueText;
+            }
+
+            if (syntaxNodeAnalysisContext.Node is PropertyDeclarationSyntax propertyNode)
+            {
+                return propertyNode.Identifier.ValueText;
+            }
+
+            if (syntaxNodeAnalysisContext.Node is FieldDeclarationSyntax fieldNode)
+            {
+                // We're assuming nobody is doing public fields like
+                // public int x, y;
+                return fieldNode.Declaration.Variables[0].Identifier.ValueText;
             }
 
             throw new System.Exception($"Not prepared for {syntaxNodeAnalysisContext}");

@@ -48,7 +48,12 @@ namespace CommentPorter
 
             var token = root.FindToken(diagnostic.Location.SourceSpan.Start, findInsideTrivia: true);
             var tagText = $"/// <include file=\"{documentationFile}\" path=\"{xpath}\" />{Environment.NewLine}\t";
-            
+
+            if (tagText.Contains("//Member")) 
+            {
+                tagText += "\t"; // This will be the proper indentation for like 90% of the cases
+            }
+
             return new TextChange(new TextSpan(token.SpanStart, 0), tagText);
         }
     }

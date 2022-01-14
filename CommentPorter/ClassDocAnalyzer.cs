@@ -35,7 +35,8 @@ namespace CommentPorter
                 SyntaxKind.EnumDeclaration, SyntaxKind.StructDeclaration);
 
             context.RegisterSyntaxNodeAction(CheckForMissingMemberInclude, SyntaxKind.MethodDeclaration, 
-                SyntaxKind.PropertyDeclaration, SyntaxKind.FieldDeclaration, SyntaxKind.EnumMemberDeclaration);
+                SyntaxKind.PropertyDeclaration, SyntaxKind.FieldDeclaration, SyntaxKind.EnumMemberDeclaration, 
+                SyntaxKind.ConstructorDeclaration);
         }
 
         void CheckForMissingInclude(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
@@ -233,6 +234,11 @@ namespace CommentPorter
             if (syntaxNodeAnalysisContext.Node is EnumMemberDeclarationSyntax enumMemberNode)
             {
                 return enumMemberNode.Identifier.ValueText;
+            }
+
+            if (syntaxNodeAnalysisContext.Node is ConstructorDeclarationSyntax constructorNode)
+            {
+                return ".ctor";
             }
 
             throw new System.Exception($"Not prepared for {syntaxNodeAnalysisContext}");

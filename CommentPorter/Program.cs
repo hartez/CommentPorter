@@ -35,44 +35,85 @@ namespace CommentPorter
             var projectPaths = new List<string>() 
             {
                 Path.Combine(mauiFolder, "Core\\src\\Core-net6.csproj"),
-                Path.Combine(mauiFolder, "Controls\\src\\Core\\Controls.Core-net6.csproj")
+                Path.Combine(mauiFolder, "Controls\\src\\Core\\Controls.Core-net6.csproj"),
+                Path.Combine(mauiFolder, "Essentials\\src\\Essentials-net6.csproj")
             };
 
-            var rootNamespaces = new List<string>()
+            var sourceRootNamespaces = new List<string>()
+            {
+                "Xamarin.Forms",
+                "Xamarin.Forms",
+                "Xamarin.Essentials"
+            };
+
+            var destRootNamespaces = new List<string>()
             {
                 "Microsoft.Maui",
-                "Microsoft.Maui.Controls"
+                "Microsoft.Maui.Controls",
+                "Microsoft.Maui.Essentials"
             };
 
             var docsPaths = new List<string>() 
             {
                 Path.Combine(mauiFolder, "Core\\docs"),
-                Path.Combine(mauiFolder, "Controls\\docs")
+                Path.Combine(mauiFolder, "Controls\\docs"),
+                Path.Combine(mauiFolder, "Essentials\\docs")
             };
 
-            DocFinder.DocsSource = "C:\\maui\\Xamarin.Forms-api-docs\\docs";
+            var docsSources = new List<string>()
+            {
+                "C:\\maui\\Xamarin.Forms-api-docs\\docs",
+                "C:\\maui\\Xamarin.Forms-api-docs\\docs",
+                "C:\\maui\\maui\\src\\Essentials\\docs\\en"
+            };
 
             for (int n = 0; n < projectPaths.Count; n++) 
             {
-                await UpdateDocsForProject(projectPaths[n], docsPaths[n], rootNamespaces[n]);
-            }            
+                DocFinder.DocsSource = docsSources[n];
+
+                await UpdateDocsForProject(projectPaths[n], docsPaths[n], sourceRootNamespaces[n], destRootNamespaces[n]);
+
+                // Grab all the images files from the the docs source so that links to images
+                // don't blow up when generating the docs site
+                CopyImages(docsPaths[n], destRootNamespaces[n]);
+            }   
         }
 
-        static async Task UpdateDocsForProject(string projectPath, string docsPath, string namespaceRoot) 
+        static void CopyImages(string docsPath, string ns) 
+        {
+            var imagesSource = Path.Combine(DocFinder.DocsSource, "Xamarin.Forms", "_images");
+
+            if (!Directory.Exists(imagesSource))
+            {
+                return;
+            }
+
+            var imagesDest = Path.Combine(docsPath, ns, "_images");
+
+            if (!Directory.Exists(imagesDest)) 
+            { 
+                Directory.CreateDirectory(imagesDest);
+            }
+
+            var imageFiles = Directory.EnumerateFiles(imagesSource);
+            foreach (var imageFile in imageFiles)
+            {
+                var imageDest = Path.Combine(imagesDest, Path.GetFileName(imageFile));
+                File.Copy(imageFile, imageDest, true);
+            }
+        }
+
+        static async Task UpdateDocsForProject(string projectPath, string docsPath, string sourceNamespaceRoot, string destNamespaceRoot) 
         {
             CancellationToken cancellationToken = CancellationToken.None;
 
             DocFinder.DocsPath = docsPath;
-            DocFinder.NamespaceMap = new NamespaceMap(namespaceRoot);
+            DocFinder.NamespaceMap = new NamespaceMap(sourceNamespaceRoot, destNamespaceRoot);
 
-            // Clean out the docs folder if it exists
-            if (Directory.Exists(docsPath))
+            if (!Directory.Exists(docsPath))
             {
-                Directory.Delete(docsPath, true);    
+                Directory.CreateDirectory(docsPath);
             }
-
-            // And create it anew
-            Directory.CreateDirectory(docsPath);
 
             using (var workspace = MSBuildWorkspace.Create())
             {

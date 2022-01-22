@@ -9,7 +9,7 @@ namespace CommentPorter
         public static string DocsSource { get; set; }
         public static NamespaceMap NamespaceMap { get; set; }
 
-        static string BuildDocPath(string docsRoot, string ns, string className)
+        public static string BuildDocPath(string docsRoot, string ns, string className)
         {
             var path = Path.Combine(docsRoot, ns ?? "", $"{className}.xml");
             return path;
@@ -62,7 +62,7 @@ namespace CommentPorter
 
                         // Now we need to fix up the namespaces
                         string content = File.ReadAllText(docFilePath);
-                        content = content.Replace(NamespaceMap.FormsRoot, NamespaceMap.Root);
+                        content = content.Replace(NamespaceMap.SourceRoot, NamespaceMap.DestinationRoot);
                         File.WriteAllText(docFilePath, content);
                     }
                     else
@@ -79,42 +79,43 @@ namespace CommentPorter
 
     public class NamespaceMap
     {
-        public string Root { get; }
-        public const string FormsRoot = "Xamarin.Forms";
+        public string DestinationRoot { get; }
+        public string SourceRoot { get; }
 
-        public NamespaceMap(string root)
+        public NamespaceMap(string sourceRoot, string destRoot)
         {
-            Root = root;
+            DestinationRoot = destRoot;
+            SourceRoot = sourceRoot;
         }
 
         public string ToDestination(string ns)
         {
-            if (ns.StartsWith(Root)) 
+            if (ns.StartsWith(DestinationRoot)) 
             { 
                 return ns; 
             }
 
-            if (!ns.StartsWith(FormsRoot))
+            if (!ns.StartsWith(SourceRoot))
             {
                 return null;
             }
 
-            return Root + ns.Substring(FormsRoot.Length);
+            return DestinationRoot + ns.Substring(SourceRoot.Length);
         }
 
         public string ToSource(string ns) 
         {
-            if (ns.StartsWith(FormsRoot))
+            if (ns.StartsWith(SourceRoot))
             {
                 return ns;
             }
 
-            if (!ns.StartsWith(Root)) 
+            if (!ns.StartsWith(DestinationRoot)) 
             {
                 return null;
             }
 
-            return FormsRoot + ns.Substring(Root.Length);
+            return SourceRoot + ns.Substring(DestinationRoot.Length);
         }
     }
 }
